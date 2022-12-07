@@ -1,0 +1,230 @@
+---
+title: "ADA final project"
+output: html_document
+date: "2022-09-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+pacman::p_load(haven, tidyverse, naniar, VIM, mice, lattice, table1, car)
+pacman::p_load(odds.n.ends, blorr, lmtest, car,  broom, tidyverse, jtools) 
+pacman::p_load(survminer,survival,tidyverse,lmtest,foreign)
+pacman::p_load(tidyverse, survRM2, haven, magrittr, mlr)
+```
+
+#Load the dataset
+```{r}
+contra1<-read_dta("/Users/laptop2/Library/CloudStorage/OneDrive-WashingtonUniversityinSt.Louis/Classes Fall 2022/ADA/ADA project/dataverse_files/MFPS_PNAS_SURVIVAL_DATA.dta")
+```
+
+#Recode the variables
+```{r}
+contra1$edu_primary <- NA
+contra1$edu_primary<-ifelse(contra1$edu_primary_bl == 1, 0, contra1$edu_primary)
+contra1$edu_primary<-ifelse(contra1$edu_primary_bl == 0, 1, contra1$edu_primary)
+
+contra1$Treatment<-NA
+contra1$Treatment<-ifelse(contra1$treatment == 1, '0', contra1$Treatment) #Recode treated to treated=0
+contra1$Treatment<-ifelse(contra1$treatment == 0, '1', contra1$Treatment) #Recode control to control=1
+
+contra1$Employment<-NA
+contra1$Employment<-ifelse(contra1$work_bl == 1, 'Employed', contra1$Employment)
+contra1$Employment<-ifelse(contra1$work_bl == 0, 'Unemployed', contra1$Employment)
+
+contra1$Education <- NA
+contra1$Education<-ifelse(contra1$edu_primary == 1, 'At least secondary education', contra1$Education)
+contra1$Education<-ifelse(contra1$edu_primary == 0, 'Primary education or less', contra1$Education)
+
+contra1$`Any short pregnancy interval events (<=24 months)` <- NA
+contra1$`Any short pregnancy interval events (<=24 months)`<-ifelse(contra1$event_next_preg_24 == 1, 'Prenancy in 24 months', contra1$`Any short pregnancy interval events (<=24 months)`)
+contra1$`Any short pregnancy interval events (<=24 months)`<-ifelse(contra1$event_next_preg_24 == 0, 'No pregnancy in 24 months', contra1$`Any short pregnancy interval events (<=24 months)`)
+```
+
+```{r}
+contra1$treatment1<-factor(contra1$Treatment,
+      levels = c(0,1),
+      labels = c("Treated", "Control"))
+```
+#Figure 1
+```{r}
+grViz("digraph flowchart {
+
+      # node definitions with substituted label text
+      node [fontname = Helvetica, shape = rectangle, fontsize=10] 
+      tab1 [label = '@@1'] # starting
+      tab2 [label = '@@2'] 
+      tab3 [label = '@@3'] 
+      tab4 [label = '@@4'] 
+      tab5 [label = '@@5'] 
+      
+      # edge definitions with the node IDs are used to indicate how the rectangle boxes flow from each other. This is a simple flow chart but I could create branching instead as below
+      tab1 -> tab2 -> tab3 
+      tab3 -> tab4
+      tab3 -> tab5 
+}
+      #This set of code provides the text in each rectangle box.
+      [1]: '12590 household screened by the data collector during the recruitment period, from September 2016 to January 2017, n=12590'
+      [2]: '2490 women were identified as eligible according to the eligibility criteria(including good health condition, age >15 years and ≤35 yrs, etc.), n=2490'
+      [3]: '1772 women consented the participation of the data collection and were randomly assigned to the control group and the treatment group'
+      [4]: '843 women were assigned to the treatment group.'
+      [5]: '929 women were assigned to the control group.'
+      ")
+
+
+```
+
+#Table 1
+```{r}
+library(plyr)
+table1(~Education+ Employment + `Any short pregnancy interval events (<=24 months)` + month_next_preg|treatment1, contra1)
+```
+#Interpretation of Table 1
+#Education: The percentage of people who received at least secondary education in those who didn't receive family planning intervention in the control group was slightly lower than the percentage of people who received at least secondary education those who received the intervention in the treatment group (control: 43.4%, treatment: 44.4%). The percentage of people who received primary education or less in the control group was slightly higher to the percentage of people who received primary education or less in the treatment group (control: 56.6%, treatment: 55.6%).
+
+#Employment: The percentage of people who were employed in the control group was slightly lower compared to the percentage of people who were employed in the treatment group (control: 10.0%, treatment: 10.4%). The percentage of people who were not employed in the control group was slightly higher compared to the percentage of people who were not employed in the treatment group (control: 90.0%, treatment: 89.6%).
+
+#Any short pregnancy interval (<=24 months): The percentage of people who became pregnant in 24 months or less since the index birth in the control group were higher compared to the percentage of people who became pregnant in 24 months or less since the index birth in the treatment group (control: 8.5%, treatment: 4.9%). The percentage of people who didn't became pregnant in 24 months or less since the index birth are lower than the percentage of people who didn't became pregnant in 24 months or less since the index birth in the treatment group (control: 91.5%, treatment: 95.1%).
+
+#Survival time: The mean survival time to next pregnancy event for those in the control group (mean=20.2 +/- 4.80) was very slightly higher to the mean survival time to next pregnancy event for those in the treatment group (mean=20.4 +/- 4.75). The median survival time to next pregnancy event for those in the control group (median=21.8, range=[0.633, 24.0]) was very slightly lower compared to the median survival time to next pregnancy event for those in the treatment group (median=22.2, range=[0.633, 24.0]).
+
+
+#Convert some variables to factors
+```{r}
+#Employment status(contra1$work_bl), education and any short pregnancy interval event in the original dataset are numeric, after checking the data type of treatment, it appears that treatment is not a factor or character data type, although all of them should be treated as categorial variables. Here I created two new columns to convert the numeric values to characters, and then to factors.
+class(contra1$work_bl) #"numeric"
+class(contra1$event_next_preg_24) #"numeric"
+class(contra1$edu_primary)#"numeric"
+
+contra1$Work<-NA
+contra1$Work<-ifelse(contra1$work_bl == 1, '1', contra1$Work)
+contra1$Work<-ifelse(contra1$work_bl == 0, '0', contra1$Work)
+contra1$event_short_preg<-NA
+contra1$event_short_preg<-ifelse(contra1$event_next_preg_24==1, '1', contra1$event_short_preg)
+contra1$event_short_preg<-ifelse(contra1$event_next_preg_24==0, '0', contra1$event_short_preg)
+
+class(contra1$Work) #"character"
+class(contra1$event_short_preg) #"character"
+class(contra1$edu_primary) #"character"
+
+contra1$Work<-as.factor(contra1$Work)
+contra1$event_short_preg<-as.factor(contra1$event_short_preg)
+contra1$edu_primary<-as.factor(contra1$edu_primary)
+
+class(contra1$Work) #"factor"
+class(contra1$event_short_preg) #"factor"
+class(contra1$edu_primary) #"factor
+```
+
+#Run the Kaplan Meier curve
+```{r}
+treat.mod<-survfit(Surv(month_next_preg,event_next_preg_24)~treatment1, data = contra1)
+treat.mod
+summary(treat.mod)
+```
+
+#Plot the survival curves for treatment group vs. control group
+```{r}
+ggsurvplot(
+  treat.mod, 
+  data=contra1, 
+  censor=FALSE,
+  conf.int = TRUE,
+  risk.table = "nrisk_cumevents",
+  risk.table.col = "strata",# Risk table color by groups
+  risk.table.height = 0.3, # Useful to change when you have multiple groups
+  break.time.by = 4,   
+  ylim = c(0.85, 1),
+  xlab = "Months since index birthdate",
+  ylab = "Probability",
+  legend.labs = 
+    c("Control", "Treated"),
+  pval = TRUE
+)
+```
+
+#Run a univariate Cox model to examine the association between control vs. treatment group and pregnancy event
+```{r}
+treat.mod1<-coxph(Surv(month_next_preg, event_next_preg_24)~treatment1, data=contra1, ties="breslow")
+summary(treat.mod1)
+#Interpretation: The hazard of becoming pregnant in 24 months or less in those who were not treated was 1.77 (95% CI 1.214-2.581) times higher than the hazard of becoming pregnant in 24 months or less in those who were treated.
+```
+
+#Run a Cox model to examine the association between control vs. treatment group and pregnancy event adjusting for education and work status
+```{r}
+treat_adj1.mod<-coxph(Surv(month_next_preg, event_next_preg_24)~treatment1 + edu_primary + Work, data=contra1)
+summary(treat_adj1.mod)
+# Interpretation: After adjusting for education and work status, those who were not treated had a 1.77 (95% CI 1.2138-2.581) times higher hazard of becoming pregnant in 24 months or less in those who were treated. 
+```
+
+#Use likelihood ratio test to determine which model (univariate model or adjusted model) provides a better fit for treatment(treated vs. control) and any prenancy event in 24 months or less since the index birth.
+```{r}
+lrtest(treat.mod1, treat_adj1.mod)
+# The likelihood ratio test indicated that the model that includes education and work status does not significantly improve fit compared to the model with just treatment (p=0.7778). 
+```
+
+#Check asssumptions
+#1. Test assumption for the Cox PH model
+```{r eval=FALSE, echo=FALSE}
+test.ph<-cox.zph(treat.mod1, terms=TRUE)
+test.ph
+plot(test.ph, resid=FALSE)
+ggcoxzph(test.ph)
+ggcoxdiagnostics(treat_adj1.mod, type = "schoenfeld")  # another way
+#The global test shows that the test is not statistically significant (p=0.37). This shows that proportional hazards assumption was met in the model.
+```
+#2. Assumptions pertaining to linear relationship between continuous variables and outcome and influential observations were not checked and were not needed for this project because the variables including treatment(control vs. treated), education (primary or less, at least secondary), and employment status(employed and unemployed) are binary.
+
+#3.Log-log curves: log(-log(survival)) against log(time)
+#From this figure we can see that this assumption is violated because the lines crosses each other.
+```{r}
+plot(treat.mod, col=c("black", "red"), main= "rx log log plot", fun="cloglog", xlab="Time", ylab="log(-log(S(t))")
+```
+
+
+#Therefore, RMST is used as it is one of the solutions when the assumption for Cox PH model is violated
+
+# 1. The mean survival time for comparisons was caltulated
+```{r}
+contra2 <- contra1 %>%
+  group_by(treatment1) %>%
+  summarise(mean_survt = mean(month_next_preg))
+```
+
+# 2. Calculate RMST for both groups using rmst2 function
+```{r}
+mod <- rmst2(time=contra1$month_next_preg, status=contra1$event_next_preg_24, arm=contra1$treatment, tau=24) 
+print(mod)
+
+# Plot the survival probability
+plot(mod, xlab="Months since index birthdate", ylab="Probability", ylim = c(0.85, 1))
+```
+
+# Interpretation: First Block: Restricted Mean Survival Time (RMST) by arm
+-  The mean time for months to first pregnancy event since index birthdate for individuals in the treatment group was 23.392 months (95% CI: 23.191-23.592) when following the participants for 24 months.
+-  The mean time for months of pregnancy event since index birthdate for individuals in the control group was 23.025 months (95% CI: 22.796-23.254) when following the participants for 24 months.
+
+# Interpretation: Second Block: Restricted Mean Time Lost (RMTL) by arm
+-  The mean time lost for months to first pregnancy event since index birthdate for individuals in the treatment group was 0.608 months (95% CI: 0.408-0.809) when following the participants for 24 months.
+-  The mean time lost for months to first pregnancy event since index birthdate for individuals in the control group was 0.975 months (95% CI: 0.746-1.204) when following the patients for 24 months.
+
+# Interpretation: Third Block: Between-group contrast
+-  The difference in RMST (the first row) was 0.367 months, with a 95% confidence interval ranging from 0.063 to 0.671 months. The point estimate indicates that the time of months to pregnancy event since index birthdate since treatment for individuals in the control group was 0.367 months shorter than individuals in the treatment group on average, when following the patients for 24 months.
+- The RMST ratio of 1.016 indicates that the mean survival time was 1.016 (95% CI: 1.003-1.029) times longer in the treated group than the control group within 24 months.
+- The RMTL ratio indicates that within 24 months the mean time lost in treated group is 62.4% (95% CI 41.6% to 93.5%) of the mean time lost in the control group within 24 months.
+
+```{r}
+# Choose the set of covariates 
+covar <- c(contra1$Work, contra1$edu_primary)
+# add the covariates argument to the RMST function
+mod1 <- rmst2(contra1$month_next_preg, contra1$event_next_preg_24, contra1$treatment, tau=24, covariates = covar)
+print(mod1)
+```
+
+# Interpretation
+
+-  The difference in RMST was 0.367 months. The point estimate indicates that the time to pregnancy event since index birthdate for treated individuals is 0.367 months longer than individuals in the control group on average, when following the patients for 24 months and adjusting for all other variables (employment status and education) constant.
+-  This mean time to pregnancy event since index birthdate difference is statistically significant (p<0.05), concurs with the 95% confidence interval (0.215 to 0.519). 
+-  Since the changes in RMST do not differ by 10% after adjustment, it shows that these variables (employment status and education) are unlikely to confound the association between treatment regimens and months to first pregnancy event since index birthdate.
