@@ -215,6 +215,7 @@ plot(mod, xlab="Months since index birthdate", ylab="Probability", ylim = c(0.85
 - The RMST ratio of 1.016 indicates that the mean survival time was 1.016 (95% CI: 1.003-1.029) times longer in the treated group than the control group within 24 months.
 - The RMTL ratio indicates that within 24 months the mean time lost in treated group is 62.4% (95% CI 41.6% to 93.5%) of the mean time lost in the control group within 24 months.
 
+#3. Adjust for employment status and education level
 ```{r}
 # Choose the set of covariates 
 covar <- c(contra1$Work, contra1$edu_primary)
