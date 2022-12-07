@@ -133,8 +133,8 @@ ggsurvplot(
   censor=FALSE,
   conf.int = TRUE,
   risk.table = "nrisk_cumevents",
-  risk.table.col = "strata",# Risk table color by groups
-  risk.table.height = 0.3, # Useful to change when you have multiple groups
+  risk.table.col = "strata",
+  risk.table.height = 0.3,
   break.time.by = 4,   
   ylim = c(0.85, 1),
   xlab = "Months since index birthdate",
